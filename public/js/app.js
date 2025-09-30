@@ -686,11 +686,13 @@ class ProteinViewer {
                     this.addToConsole('All representations hidden', 'success');
                 }
                 break;
-            case 'bg_color':
-                if (args.length > 0) {
-                    this.setBackgroundColor(args[0]);
+            case 'set':
+                if (args.length >= 2 && args[0].toLowerCase() === 'bgcolor') {
+                    this.setBackgroundColor(args[1]);
+                } else if (args.length < 2) {
+                    this.addToConsole('Usage: set bgColor [color]', 'error');
                 } else {
-                    this.addToConsole('Usage: bg_color [black|white|gray|blue|red|green] or bg_color [r,g,b]', 'error');
+                    this.addToConsole(`Unknown set command: ${args[0]}`, 'error');
                 }
                 break;
             default:
@@ -713,7 +715,7 @@ class ProteinViewer {
             '  history clear - Clear saved command history',
             '  reset - Reset camera to default position',
             '  center - Center structure in view',
-            '  bg_color [color] - Set background color (black, white, gray, blue, red, green, darkblue, or r,g,b)',
+            '  set bgColor [color] - Set background color (black, white, gray, blue, red, green, darkblue, or r,g,b)',
             '',
             'Representations (PyMOL style):',
             '  cartoon - Toggle cartoon ribbons',
