@@ -11,8 +11,7 @@ class ProteinViewer {
         this.camera = null;
         this.renderer = null;
 
-        // Command console state
-        this.consoleOpen = false;
+        // Command console state (always visible in smol2)
         this.commandHistory = this.loadCommandHistory();
         this.historyIndex = -1;
 
@@ -69,41 +68,29 @@ class ProteinViewer {
         this.scene = new BABYLON.Scene(this.engine);
         this.scene.clearColor = new BABYLON.Color3(0, 0, 0);
 
-        // Create UniversalCamera for 6DOF movement like Descent 2
-        this.camera = new BABYLON.UniversalCamera(
+        // Create ArcRotateCamera for PyMOL-style rotation around protein
+        this.camera = new BABYLON.ArcRotateCamera(
             'camera',
-            new BABYLON.Vector3(0, 0, -50),
+            Math.PI / 2,      // alpha (horizontal rotation)
+            Math.PI / 3,      // beta (vertical rotation)
+            50,               // radius (distance from target)
+            BABYLON.Vector3.Zero(), // target point (origin)
             this.scene
         );
 
-        // Set initial camera orientation to look at origin
-        this.camera.setTarget(BABYLON.Vector3.Zero());
+        // Attach camera controls to canvas
+        this.camera.attachControl(this.canvas, true);
 
-        // Configure movement speeds (like Descent 2)
-        this.camera.speed = 2.0;          // Movement speed (increased for faster movement)
-        this.camera.angularSensibility = 2000; // Mouse sensitivity
+        // Configure camera behavior for PyMOL-style interaction
+        this.camera.lowerRadiusLimit = 5;    // Minimum zoom distance
+        this.camera.upperRadiusLimit = 500;  // Maximum zoom distance
+        this.camera.wheelPrecision = 50;     // Zoom sensitivity
+        this.camera.panningSensibility = 50; // Pan sensitivity (right-click drag)
+        this.camera.angularSensibilityX = 1000; // Rotation sensitivity horizontal
+        this.camera.angularSensibilityY = 1000; // Rotation sensitivity vertical
 
-        // Set canvas as focusable for keyboard input
-        this.canvas.tabIndex = 1;
-        this.canvas.focus();
-
-        // Setup mouse look controls manually
-        this.setupMouseLook();
-
-        // Track key states for smooth movement (all 6DOF keys)
-        this.keyStates = {
-            w: false,  // Move forward
-            s: false,  // Move backward
-            a: false,  // Strafe left
-            d: false,  // Strafe right
-            q: false,  // Move down
-            e: false,  // Move up
-            j: false,  // Mouse left (vi keys shifted one over)
-            k: false,  // Mouse down
-            l: false,  // Mouse right
-            i: false,  // Mouse up (alternative to ;)
-            ';': false // Mouse up
-        };
+        // Enable panning with right mouse button
+        this.camera.panningMouseButton = 2; // Right mouse button for panning
 
         // Lighting setup
         this.setupLighting();
@@ -175,18 +162,11 @@ class ProteinViewer {
     }
 
     setupEventHandlers() {
-        // Prevent context menu on canvas
+        // Prevent context menu on canvas (we use right-click for panning)
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-        // Handle canvas focus for keyboard events
-        this.canvas.addEventListener('click', () => {
-            this.canvas.focus();
-            console.log('Canvas focused for keyboard input');
-        });
-
-        // Keyboard shortcuts
+        // Keyboard shortcuts - only for special keys, all typing goes to console
         window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-        window.addEventListener('keyup', (e) => this.handleKeyUp(e));
 
         // Handle camera movement for LOD updates
         this.camera.onViewMatrixChangedObservable.add(() => {
@@ -199,176 +179,27 @@ class ProteinViewer {
     handleKeyDown(event) {
         const key = event.key.toLowerCase();
 
-        // Handle Enter key for console toggle (highest priority)
-        if (event.key === 'Enter') {
-            // Don't process Enter if console is open (let console handle it)
-            if (!this.consoleOpen) {
-                this.toggleConsole();
-                event.preventDefault();
-            }
-            return;
-        }
-
-        // Handle Escape key to close console
-        if (event.key === 'Escape') {
-            if (this.consoleOpen) {
-                this.toggleConsole();
-                event.preventDefault();
-            }
-            return;
-        }
-
-        // Don't process other keys if console is open
-        if (this.consoleOpen) {
-            return;
-        }
-
-        console.log('Key pressed:', key);
-
-        // Handle continuous movement keys
-        if (key in this.keyStates) {
-            this.keyStates[key] = true;
-            console.log(`${key.toUpperCase()} key down`);
-            event.preventDefault();
-        }
-
-        // Handle single-press actions
+        // Handle single-press actions for special keys only
         switch (key) {
             case 'r':
                 if (this.renderer) this.renderer.resetCamera();
+                event.preventDefault();
                 break;
             case 'c':
                 if (this.renderer) this.renderer.centerStructure();
-                break;
-            case '1':
-                this.toggleRepresentation('cartoon');
-                break;
-            case '2':
-                this.toggleRepresentation('backbone');
-                break;
-            case '3':
-                this.toggleRepresentation('atoms');
+                event.preventDefault();
                 break;
             case 'f':
                 this.toggleFullscreen();
+                event.preventDefault();
                 break;
         }
+        // All other keys go to the console input (handled by browser)
     }
 
-    handleKeyUp(event) {
-        const key = event.key.toLowerCase();
-
-        // Don't process keys if console is open
-        if (this.consoleOpen) {
-            return;
-        }
-
-        if (key in this.keyStates) {
-            this.keyStates[key] = false;
-            console.log(`${key.toUpperCase()} key up`);
-            event.preventDefault();
-        }
-    }
-
-    // Update camera position based on key states (called in render loop)
-    updateMovement() {
-        const moveSpeed = this.camera.speed * 0.3;
-
-        // Get camera's forward direction based on current rotation
-        const yaw = this.camera.rotation.y;
-        const pitch = this.camera.rotation.x;
-
-        // Calculate forward and right vectors based on camera rotation
-        const forward = new BABYLON.Vector3(
-            Math.sin(yaw) * Math.cos(pitch),
-            -Math.sin(pitch),
-            Math.cos(yaw) * Math.cos(pitch)
-        );
-
-        const right = new BABYLON.Vector3(
-            Math.cos(yaw),
-            0,
-            -Math.sin(yaw)
-        );
-
-        const up = new BABYLON.Vector3(0, 1, 0); // World up
-
-        if (this.keyStates.w) {
-            // Move forward in the direction you're looking
-            this.camera.position.addInPlace(forward.scale(moveSpeed));
-        }
-        if (this.keyStates.s) {
-            // Move backward from the direction you're looking
-            this.camera.position.addInPlace(forward.scale(-moveSpeed));
-        }
-        if (this.keyStates.a) {
-            // Strafe left
-            this.camera.position.addInPlace(right.scale(-moveSpeed));
-        }
-        if (this.keyStates.d) {
-            // Strafe right
-            this.camera.position.addInPlace(right.scale(moveSpeed));
-        }
-        if (this.keyStates.q) {
-            // Move down (Descent 2 style)
-            this.camera.position.addInPlace(up.scale(-moveSpeed));
-        }
-        if (this.keyStates.e) {
-            // Move up (Descent 2 style)
-            this.camera.position.addInPlace(up.scale(moveSpeed));
-        }
-
-        // Handle keyboard mouse movement (jkl; keys - vi keys shifted one over)
-        this.updateKeyboardMouse();
-    }
-
-    // Update camera rotation based on keyboard mouse movement (jkl; keys)
-    updateKeyboardMouse() {
-        const mouseSensitivity = 0.017; // Sensitivity for keyboard mouse movement (1/3 of original 0.05)
-        let deltaX = 0;
-        let deltaY = 0;
-
-        // Calculate mouse movement based on key states
-        if (this.keyStates.j) {
-            deltaX -= mouseSensitivity; // Look left
-        }
-        if (this.keyStates[';']) {
-            deltaX += mouseSensitivity; // Look right
-        }
-        if (this.keyStates.k) {
-            deltaY += mouseSensitivity; // Look down
-        }
-        if (this.keyStates.l || this.keyStates.i) {
-            deltaY -= mouseSensitivity; // Look up
-        }
-
-        // Apply mouse movement if any keys are pressed
-        if (deltaX !== 0 || deltaY !== 0) {
-            // Get current rotation
-            const yaw = this.camera.rotation.y;
-            const pitch = this.camera.rotation.x;
-
-            // Apply movement
-            const newYaw = yaw + deltaX;
-            const newPitch = pitch + deltaY;
-
-            // Clamp pitch to prevent camera flipping
-            const clampedPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, newPitch));
-
-            // Set new rotation
-            this.camera.rotation.y = newYaw;
-            this.camera.rotation.x = clampedPitch;
-
-            // Update camera direction for movement calculations
-            this.updateCameraDirection();
-        }
-    }
 
     startRenderLoop() {
         this.engine.runRenderLoop(() => {
-            // Update movement based on key states
-            this.updateMovement();
-
             // Render the scene
             this.scene.render();
         });
@@ -582,77 +413,6 @@ class ProteinViewer {
         }
     }
 
-    // Setup mouse look controls
-    setupMouseLook() {
-        this.mouseX = 0;
-        this.mouseY = 0;
-        this.isPointerLocked = false;
-
-        // Click to enable pointer lock
-        this.canvas.addEventListener('click', () => {
-            this.canvas.requestPointerLock = this.canvas.requestPointerLock ||
-                                           this.canvas.mozRequestPointerLock ||
-                                           this.canvas.webkitRequestPointerLock;
-            if (this.canvas.requestPointerLock) {
-                this.canvas.requestPointerLock();
-            }
-        });
-
-        // Handle pointer lock changes
-        document.addEventListener('pointerlockchange', () => this.onPointerLockChange(), false);
-        document.addEventListener('mozpointerlockchange', () => this.onPointerLockChange(), false);
-        document.addEventListener('webkitpointerlockchange', () => this.onPointerLockChange(), false);
-
-        // Mouse movement handling
-        document.addEventListener('mousemove', (event) => this.onMouseMove(event), false);
-    }
-
-    onPointerLockChange() {
-        this.isPointerLocked = document.pointerLockElement === this.canvas ||
-                              document.mozPointerLockElement === this.canvas ||
-                              document.webkitPointerLockElement === this.canvas;
-
-        if (this.isPointerLocked) {
-            console.log('Mouse look enabled - move mouse to look around');
-        } else {
-            console.log('Mouse look disabled - click canvas to re-enable');
-        }
-    }
-
-    onMouseMove(event) {
-        if (!this.isPointerLocked || this.consoleOpen) return;
-
-        const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-        const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
-
-        // Apply mouse look - Descent/FPS style
-        const sensitivity = 0.003;
-
-        // Get current rotation
-        const yaw = this.camera.rotation.y;
-        const pitch = this.camera.rotation.x;
-
-        // Apply mouse movement (reversed for natural feel)
-        const newYaw = yaw + movementX * sensitivity;
-        const newPitch = pitch + movementY * sensitivity;
-
-        // Clamp pitch to prevent camera flipping
-        const clampedPitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, newPitch));
-
-        // Set new rotation
-        this.camera.rotation.y = newYaw;
-        this.camera.rotation.x = clampedPitch;
-
-        // Update camera direction for movement calculations
-        this.updateCameraDirection();
-    }
-
-    updateCameraDirection() {
-        // This ensures WASD movement works relative to where you're looking
-        const direction = new BABYLON.Vector3(0, 0, 1);
-        const rotationMatrix = BABYLON.Matrix.RotationYawPitchRoll(this.camera.rotation.y, this.camera.rotation.x, this.camera.rotation.z);
-        this.camera._cameraDirection = BABYLON.Vector3.TransformCoordinates(direction, rotationMatrix);
-    }
 
     // Command History Management
     loadCommandHistory() {
@@ -691,13 +451,11 @@ class ProteinViewer {
     setupCommandConsole() {
         const commandInput = document.getElementById('commandInput');
 
+        // Console is always visible, just process commands
         commandInput.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 const command = commandInput.value.trim();
-                if (command === '') {
-                    // Empty command - close console
-                    this.toggleConsole();
-                } else {
+                if (command !== '') {
                     // Process command
                     this.processCommand(command);
                     commandInput.value = '';
@@ -734,22 +492,9 @@ class ProteinViewer {
                 event.preventDefault();
             }
         });
-    }
 
-    toggleConsole() {
-        const console = document.getElementById('commandConsole');
-        const commandInput = document.getElementById('commandInput');
-
-        this.consoleOpen = !this.consoleOpen;
-
-        if (this.consoleOpen) {
-            console.style.display = 'block';
-            commandInput.focus();
-            this.addToConsole('Console opened. Type "help" for commands.', 'success');
-        } else {
-            console.style.display = 'none';
-            this.canvas.focus(); // Return focus to canvas for movement
-        }
+        // Show welcome message
+        this.addToConsole('smol2 - Type "help" for commands.', 'success');
     }
 
     addToConsole(text, type = 'output') {
@@ -922,14 +667,16 @@ class ProteinViewer {
             '  show [type] - Show specific representation',
             '  hide [type] - Hide specific representation',
             '',
-            'Movement:',
-            '  WASD - Move around',
-            '  QE - Move up/down',
-            '  Mouse - Look around',
-            '  jkl; - Keyboard mouse look (vi keys shifted)',
-            '  Up/Down arrows - Navigate command history',
-            '  Enter - Open/close console',
-            '  Escape - Close console'
+            'Mouse Controls (PyMOL style):',
+            '  Left click + drag - Rotate around protein',
+            '  Right click + drag - Pan (translate view)',
+            '  Scroll wheel - Zoom in/out',
+            '',
+            'Keyboard Shortcuts:',
+            '  R - Reset camera',
+            '  C - Center structure',
+            '  F - Toggle fullscreen',
+            '  Up/Down arrows - Navigate command history'
         ];
 
         commands.forEach(cmd => this.addToConsole(cmd, 'output'));

@@ -28,30 +28,30 @@
             image-rendering: -webkit-optimize-contrast;
         }
 
-        /* Minecraft-style command console */
+        /* PyMOL-style command console - always visible at bottom */
         #commandConsole {
-            position: absolute;
-            top: 0;
+            position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             width: 100%;
-            height: 100vh;
-            background: transparent;
+            height: auto;
+            background: rgba(0, 0, 0, 0.85);
             border-top: 2px solid #555;
-            display: none;
+            display: block;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             box-sizing: border-box;
+            z-index: 1000;
         }
 
         #consoleHistory {
-            height: calc(100vh - 60px);
+            height: calc(5 * 1.5em);
             overflow-y: auto;
-            padding: 15px 20px;
-            border-bottom: 1px solid #555;
+            padding: 8px 15px;
             box-sizing: border-box;
-            background: rgba(0, 0, 0, 0.1);
+            background: rgba(0, 0, 0, 0.9);
+            line-height: 1.5em;
         }
 
         .console-line {
@@ -85,10 +85,10 @@
 
         #commandInput {
             width: calc(100% - 30px);
-            background: transparent;
+            background: rgba(0, 0, 0, 0.9);
             border: none;
             color: #fff;
-            padding: 12px;
+            padding: 8px 12px;
             outline: none;
             font-family: inherit;
             font-size: inherit;
@@ -97,7 +97,7 @@
         }
 
         #commandInput:focus {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(20, 20, 20, 0.95);
         }
 
         .command-prompt {
@@ -110,17 +110,23 @@
             font-weight: bold;
         }
 
+        .input-container {
+            position: relative;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 5px 0;
+        }
+
     </style>
 </head>
 <body>
     <canvas id="renderCanvas"></canvas>
 
-    <!-- Command Console (Minecraft style) -->
+    <!-- Command Console (PyMOL style) -->
     <div id="commandConsole">
         <div id="consoleHistory"></div>
-        <div style="position: relative; background: rgba(0, 0, 0, 0.9); padding: 5px 0;">
+        <div class="input-container">
             <span class="command-prompt">></span>
-            <input type="text" id="commandInput" placeholder="Enter command..." autocomplete="off">
+            <input type="text" id="commandInput" placeholder="Type commands here..." autocomplete="off" autofocus>
         </div>
     </div>
 
