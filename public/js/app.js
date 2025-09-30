@@ -592,22 +592,22 @@ class ProteinViewer {
                     this.addToConsole('Usage: load/open [filename] (e.g., "open 1erm")', 'error');
                 }
                 break;
-            case 'delete':
+            case 'close':
                 if (args.length > 0) {
                     if (args[0] === 'all') {
                         this.renderer.clearAllProteins();
-                        this.addToConsole('All proteins deleted', 'success');
+                        this.addToConsole('All proteins closed', 'success');
                     } else {
                         // Try to remove specific protein
                         const removed = this.renderer.removeProtein(args[0]);
                         if (removed) {
-                            this.addToConsole(`Protein ${args[0]} deleted`, 'success');
+                            this.addToConsole(`Protein ${args[0]} closed`, 'success');
                         } else {
                             this.addToConsole(`Protein ${args[0]} not found`, 'error');
                         }
                     }
                 } else {
-                    this.addToConsole('Usage: delete all | delete [filename] (e.g., "delete all" or "delete 1erm.pdb")', 'error');
+                    this.addToConsole('Usage: close all | close [filename] (e.g., "close all" or "close 1erm.pdb")', 'error');
                 }
                 break;
             case 'ls':
@@ -708,8 +708,8 @@ class ProteinViewer {
             '  load/open [name] - Load PDB file (e.g., "open 1erm")',
             '  proteins / list - List currently loaded proteins',
             '  count - Show number of loaded proteins',
-            '  delete all - Remove all proteins',
-            '  delete [name] - Remove specific protein (e.g., "delete 1erm.pdb")',
+            '  close all - Remove all proteins',
+            '  close [name] - Remove specific protein (e.g., "close 1erm.pdb")',
             '  clear console - Clear console display',
             '  help - Show this help message',
             '  history - Show command history',
