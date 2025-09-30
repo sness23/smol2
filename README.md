@@ -1,6 +1,6 @@
-# Protein Cartoon Viewer - Babylon.js Implementation
+# smol2 - PyMOL-style Protein Viewer
 
-A sophisticated protein cartoon/ribbon visualization application built with Babylon.js and Express.js, implementing the same algorithms used in UCSF Chimera for high-quality molecular graphics.
+A sophisticated protein cartoon/ribbon visualization application built with Babylon.js and Express.js, featuring PyMOL-style mouse controls and a command-line interface. Implements the same algorithms used in UCSF Chimera for high-quality molecular graphics.
 
 ## Features
 
@@ -17,10 +17,11 @@ A sophisticated protein cartoon/ribbon visualization application built with Baby
 - **Frenet Frames**: Proper ribbon orientation using tangent/normal/binormal vectors
 
 ### User Interface
-- **Interactive 3D Viewer**: Mouse controls for rotation, zoom, and pan
-- **File Upload**: Support for PDB file upload and processing
-- **Real-time Controls**: Toggle representations and color schemes on-the-fly
-- **Keyboard Shortcuts**: Quick access to common functions
+- **PyMOL-style Mouse Controls**: Click-drag rotation, right-click pan, scroll zoom
+- **Command Console**: Always-visible bottom console for text commands
+- **File Management**: Support for PDB file upload and multiple protein loading
+- **Real-time Controls**: Toggle representations and color schemes via commands
+- **Command History**: Persistent command history with arrow key navigation
 
 ## Technical Implementation
 
@@ -68,34 +69,42 @@ Backend (Express.js):
 
 ### Setup
 ```bash
-cd protein-viewer
+cd smol2
 npm install
-npm start
+npm start          # Production mode
+npm run dev        # Development mode with auto-restart
 ```
 
 The application will start on `http://localhost:3000`
 
-### Controls
-- **Mouse**: Look around (free look, like FPS games)
-- **Movement Keys (Descent 2 style 6DOF)**:
-  - `W` - Move forward
-  - `S` - Move backward
-  - `A` - Strafe left
-  - `D` - Strafe right
-  - `Q` - Move down
-  - `E` - Move up
-- **Other Keyboard Shortcuts**:
-  - `R` - Reset camera view
-  - `C` - Center structure
-  - `1` - Toggle cartoon representation
-  - `2` - Toggle backbone trace
-  - `3` - Toggle atom spheres
-  - `F` - Toggle fullscreen
+### Mouse Controls (PyMOL-style)
+- **Left Click + Drag**: Rotate protein around center
+- **Right Click + Drag**: Pan (translate view)
+- **Scroll Wheel**: Zoom in/out
+
+### Keyboard Shortcuts
+- `R` - Reset camera to default position
+- `C` - Center structure in view
+- `F` - Toggle fullscreen mode
+- `Up/Down Arrows` - Navigate command history
+
+### Command Console
+The console is always visible at the bottom of the screen. Type commands directly:
+
+```
+> load 1erm              # Load protein from data directory
+> cartoon                # Toggle cartoon representation
+> show sticks            # Show ball-and-stick model
+> bg_color white         # Set background to white
+> center                 # Center structure
+> help                   # Show all commands
+```
 
 ### Loading Structures
-1. **Sample Protein**: Click "Load Sample (1ERM)" to load TEM-1 Beta Lactamase
-2. **Upload PDB**: Use file input to upload your own PDB files
-3. **Supported Formats**: Standard PDB format files (.pdb extension)
+1. **From data directory**: `load 1erm` (or any file in data/ folder)
+2. **List available files**: `ls` or `dir`
+3. **Upload PDB**: Use the file upload endpoint or add to data/ directory
+4. **Multiple proteins**: Use `load` multiple times without clearing
 
 ## Sample Structure - TEM-1 Beta Lactamase (1ERM)
 
@@ -106,25 +115,51 @@ The included sample structure is TEM-1 Beta Lactamase, a well-characterized enzy
 - **Features**: Mixed α/β structure with clear secondary structure elements
 - **Size**: ~290 residues, ideal for testing cartoon rendering
 
+## Console Commands
+
+Type `help` in the console for a full list of commands. Key commands:
+
+### File Management
+- `ls` / `dir` - List available PDB files in data directory
+- `load [name]` - Load protein (e.g., `load 1erm`)
+- `proteins` / `list` - List currently loaded proteins
+- `count` - Show number of loaded proteins
+- `delete all` - Remove all proteins
+- `delete [name]` - Remove specific protein
+
+### Representations
+- `cartoon` - Toggle cartoon ribbons
+- `backbone` - Toggle backbone trace
+- `sticks` - Toggle ball-and-stick model
+- `spheres` - Toggle space-filling spheres
+- `show [type]` - Show specific representation
+- `hide [type]` - Hide specific representation
+
+### View Control
+- `reset` - Reset camera to default position
+- `center` - Center structure in view
+- `bg_color [color]` - Set background (black, white, gray, blue, red, green, darkblue, or r,g,b values)
+
+### Utilities
+- `clear console` - Clear console output
+- `history` - Show command history
+- `history clear` - Clear saved history
+
 ## API Endpoints
 
-### GET /api/sample-pdb
-Returns the sample 1ERM structure:
-```json
-{
-  "filename": "1erm.pdb",
-  "content": "HEADER    HYDROLASE...",
-  "description": "TEM-1 Beta Lactamase - Sample protein structure"
-}
-```
+### GET /api/list-files
+List all PDB files in the data directory
+
+### GET /api/load-pdb/:filename
+Load specific PDB file from data directory
 
 ### POST /api/upload-pdb
 Upload PDB file for visualization:
 - **Body**: multipart/form-data with 'pdbFile' field
-- **Returns**: Same format as sample-pdb endpoint
+- **Returns**: Protein content for rendering
 
 ### GET /api/protein-info/:filename
-Get metadata about protein structures (extensible for future features)
+Get metadata about protein structures
 
 ## Implementation Details
 
@@ -179,19 +214,23 @@ Typical memory usage for medium-sized proteins (~300 residues):
 
 ### Project Structure
 ```
-protein-viewer/
-├── server.js              # Express.js server
-├── package.json           # Dependencies
+smol2/
+├── server.js                      # Express.js server
+├── package.json                   # Dependencies
+├── data/                          # Sample PDB files
+│   ├── 1erm.pdb
+│   ├── 2erm.pdb
+│   └── 3erm.pdb
 ├── public/
-│   ├── index.html         # Main application page
+│   ├── index.html                 # Main application page
 │   └── js/
-│       ├── pdb-parser.js      # PDB file parsing
-│       ├── spline-math.js     # B-spline mathematics
-│       ├── ribbon-geometry.js # 3D geometry generation
-│       ├── protein-renderer.js # Main renderer class
+│       ├── pdb-parser.js          # PDB file parsing
 │       ├── secondary-structure.js # Structure analysis
-│       └── app.js            # UI application logic
-└── uploads/               # Temporary file storage
+│       ├── spline-math.js         # B-spline mathematics
+│       ├── ribbon-geometry.js     # 3D geometry generation
+│       ├── protein-renderer.js    # Main renderer class
+│       └── app.js                 # UI with command console
+└── uploads/                       # Temporary file storage
 ```
 
 ### Adding New Features
@@ -207,9 +246,19 @@ Access debug utilities in browser console:
 ```javascript
 debug.app()      // Application instance
 debug.scene()    // Babylon.js scene
+debug.renderer() // Protein renderer
 debug.parser()   // PDB parser data
 debug.stats()    // Rendering statistics
 ```
+
+### Key Differences from Original Version
+
+**smol2** is a major architectural redesign:
+- **Camera**: ArcRotateCamera (PyMOL-style) instead of UniversalCamera (FPS-style)
+- **Input**: All keyboard input goes to console, no WASDQE movement
+- **Console**: Always visible at bottom (5 lines) instead of full-screen toggle
+- **Mouse**: Click-drag rotation instead of pointer-lock FPS controls
+- **Philosophy**: Command-driven workflow like PyMOL instead of game-style navigation
 
 ## Comparison with Chimera
 
