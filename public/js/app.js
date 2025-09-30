@@ -165,6 +165,23 @@ class ProteinViewer {
         // Prevent context menu on canvas (we use right-click for panning)
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+        // All keyboard input should go to console
+        const commandInput = document.getElementById('commandInput');
+
+        // Capture all keydown events globally and redirect to console
+        window.addEventListener('keydown', (e) => {
+            // Don't interfere with special keys (arrows, etc.) when console already has focus
+            if (document.activeElement === commandInput) {
+                return; // Let console handle it normally
+            }
+
+            // For any printable character or special input keys, focus the console
+            if (e.key.length === 1 || e.key === 'Backspace' || e.key === 'Delete') {
+                commandInput.focus();
+                // Let the browser handle the key in the now-focused input
+            }
+        });
+
         // Handle camera movement for LOD updates
         this.camera.onViewMatrixChangedObservable.add(() => {
             if (this.renderer) {
