@@ -84,13 +84,18 @@ class ProteinViewer {
         // Configure camera behavior for PyMOL-style interaction
         this.camera.lowerRadiusLimit = 5;    // Minimum zoom distance
         this.camera.upperRadiusLimit = 500;  // Maximum zoom distance
-        this.camera.wheelPrecision = 50;     // Zoom sensitivity
+        this.camera.wheelPrecision = 10;     // Zoom sensitivity (lower = more zoom per tick)
         this.camera.panningSensibility = 50; // Pan sensitivity (right-click drag)
         this.camera.angularSensibilityX = 1000; // Rotation sensitivity horizontal
         this.camera.angularSensibilityY = 1000; // Rotation sensitivity vertical
 
         // Enable panning with right mouse button
         this.camera.panningMouseButton = 2; // Right mouse button for panning
+
+        // Implement accelerated mouse wheel zoom
+        this.wheelDeltaAccumulator = 0;
+        this.lastWheelTime = 0;
+        this.setupAcceleratedZoom();
 
         // Lighting setup
         this.setupLighting();
@@ -161,6 +166,48 @@ class ProteinViewer {
         }
     }
 
+    setupAcceleratedZoom() {
+        // Custom wheel event handler for accelerated zooming
+        this.canvas.addEventListener('wheel', (event) => {
+            event.preventDefault();
+
+            const currentTime = Date.now();
+            const timeDelta = currentTime - this.lastWheelTime;
+
+            // Reset accumulator if it's been more than 200ms since last scroll
+            if (timeDelta > 200) {
+                this.wheelDeltaAccumulator = 0;
+            }
+
+            // Accumulate wheel delta for acceleration
+            this.wheelDeltaAccumulator += Math.abs(event.deltaY);
+
+            // Calculate acceleration factor (increases with rapid scrolling)
+            const accelerationFactor = Math.min(1 + (this.wheelDeltaAccumulator / 500), 3.0);
+
+            // Calculate zoom amount with acceleration
+            const zoomDirection = event.deltaY > 0 ? 1 : -1;
+            const baseZoomAmount = this.camera.radius * 0.05; // 5% of current radius
+            const zoomAmount = baseZoomAmount * accelerationFactor * zoomDirection;
+
+            // Apply zoom
+            this.camera.radius += zoomAmount;
+
+            // Clamp to limits
+            this.camera.radius = Math.max(
+                this.camera.lowerRadiusLimit,
+                Math.min(this.camera.upperRadiusLimit, this.camera.radius)
+            );
+
+            this.lastWheelTime = currentTime;
+
+            // Decay accumulator over time
+            setTimeout(() => {
+                this.wheelDeltaAccumulator *= 0.8;
+            }, 100);
+        }, { passive: false });
+    }
+
     setupEventHandlers() {
         // Prevent context menu on canvas (we use right-click for panning)
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -170,6 +217,13 @@ class ProteinViewer {
 
         // Capture all keydown events globally and redirect to console
         window.addEventListener('keydown', (e) => {
+            // F2 toggles console visibility
+            if (e.key === 'F2') {
+                this.toggleConsoleVisibility();
+                e.preventDefault();
+                return;
+            }
+
             // Don't interfere with special keys (arrows, etc.) when console already has focus
             if (document.activeElement === commandInput) {
                 return; // Let console handle it normally
@@ -487,7 +541,16 @@ class ProteinViewer {
         });
 
         // Show welcome message
-        this.addToConsole('smol2 - Type "help" for commands.', 'success');
+        this.addToConsole('smol2 - Type "help" for commands. Press F2 to hide/show console.', 'success');
+    }
+
+    toggleConsoleVisibility() {
+        const consoleElement = document.getElementById('commandConsole');
+        if (consoleElement.style.display === 'none') {
+            consoleElement.style.display = 'block';
+        } else {
+            consoleElement.style.display = 'none';
+        }
     }
 
     addToConsole(text, type = 'output') {
@@ -666,6 +729,7 @@ class ProteinViewer {
             '  Scroll wheel - Zoom in/out',
             '',
             'Keyboard:',
+            '  F2 - Hide/show console',
             '  Up/Down arrows - Navigate command history',
             '  Type any text - Goes directly to console input'
         ];
