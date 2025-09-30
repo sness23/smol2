@@ -165,36 +165,12 @@ class ProteinViewer {
         // Prevent context menu on canvas (we use right-click for panning)
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-        // Keyboard shortcuts - only for special keys, all typing goes to console
-        window.addEventListener('keydown', (e) => this.handleKeyDown(e));
-
         // Handle camera movement for LOD updates
         this.camera.onViewMatrixChangedObservable.add(() => {
             if (this.renderer) {
                 this.renderer.updateLOD();
             }
         });
-    }
-
-    handleKeyDown(event) {
-        const key = event.key.toLowerCase();
-
-        // Handle single-press actions for special keys only
-        switch (key) {
-            case 'r':
-                if (this.renderer) this.renderer.resetCamera();
-                event.preventDefault();
-                break;
-            case 'c':
-                if (this.renderer) this.renderer.centerStructure();
-                event.preventDefault();
-                break;
-            case 'f':
-                this.toggleFullscreen();
-                event.preventDefault();
-                break;
-        }
-        // All other keys go to the console input (handled by browser)
     }
 
 
@@ -672,11 +648,9 @@ class ProteinViewer {
             '  Right click + drag - Pan (translate view)',
             '  Scroll wheel - Zoom in/out',
             '',
-            'Keyboard Shortcuts:',
-            '  R - Reset camera',
-            '  C - Center structure',
-            '  F - Toggle fullscreen',
-            '  Up/Down arrows - Navigate command history'
+            'Keyboard:',
+            '  Up/Down arrows - Navigate command history',
+            '  Type any text - Goes directly to console input'
         ];
 
         commands.forEach(cmd => this.addToConsole(cmd, 'output'));

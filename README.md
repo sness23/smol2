@@ -82,11 +82,10 @@ The application will start on `http://localhost:3000`
 - **Right Click + Drag**: Pan (translate view)
 - **Scroll Wheel**: Zoom in/out
 
-### Keyboard Shortcuts
-- `R` - Reset camera to default position
-- `C` - Center structure in view
-- `F` - Toggle fullscreen mode
+### Keyboard Input
+- **All typing goes to console** - Just start typing commands
 - `Up/Down Arrows` - Navigate command history
+- No keyboard shortcuts - use console commands instead (e.g., `reset`, `center`)
 
 ### Command Console
 The console is always visible at the bottom of the screen. Type commands directly:
@@ -255,10 +254,10 @@ debug.stats()    // Rendering statistics
 
 **smol2** is a major architectural redesign:
 - **Camera**: ArcRotateCamera (PyMOL-style) instead of UniversalCamera (FPS-style)
-- **Input**: All keyboard input goes to console, no WASDQE movement
+- **Input**: All keyboard input goes to console, no keyboard shortcuts at all
 - **Console**: Always visible at bottom (5 lines) instead of full-screen toggle
 - **Mouse**: Click-drag rotation instead of pointer-lock FPS controls
-- **Philosophy**: Command-driven workflow like PyMOL instead of game-style navigation
+- **Philosophy**: Pure command-driven workflow like PyMOL, no game-style navigation or hotkeys
 
 ## Comparison with Chimera
 
