@@ -585,10 +585,11 @@ class ProteinViewer {
                 this.addToConsole(`${this.renderer.getProteinCount()} proteins loaded`, 'output');
                 break;
             case 'load':
+            case 'open':
                 if (args.length > 0) {
                     this.loadProteinByName(args[0]);
                 } else {
-                    this.addToConsole('Usage: load [filename] (e.g., "load 1erm")', 'error');
+                    this.addToConsole('Usage: load/open [filename] (e.g., "open 1erm")', 'error');
                 }
                 break;
             case 'delete':
@@ -704,7 +705,7 @@ class ProteinViewer {
         const commands = [
             'Available commands:',
             '  ls / dir - List available PDB files',
-            '  load [name] - Load PDB file (e.g., "load 1erm")',
+            '  load/open [name] - Load PDB file (e.g., "open 1erm")',
             '  proteins / list - List currently loaded proteins',
             '  count - Show number of loaded proteins',
             '  delete all - Remove all proteins',
