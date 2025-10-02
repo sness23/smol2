@@ -11,6 +11,7 @@ class PDBParser {
         this.helices = [];
         this.sheets = [];
         this.header = {};
+        this.ligands = []; // Store ligand molecules separately
     }
 
     parse(pdbText) {
@@ -35,8 +36,9 @@ class PDBParser {
         this.buildResidues(atomMap);
         this.buildChains();
         this.assignSecondaryStructure();
+        this.buildLigands();
 
-        console.log(`Parsed ${this.atoms.length} atoms, ${this.residues.length} residues, ${this.chains.length} chains`);
+        console.log(`Parsed ${this.atoms.length} atoms, ${this.residues.length} residues, ${this.chains.length} chains, ${this.ligands.length} ligands`);
         return this;
     }
 
@@ -47,6 +49,7 @@ class PDBParser {
         this.helices = [];
         this.sheets = [];
         this.header = {};
+        this.ligands = [];
     }
 
     parseHeader(line) {
@@ -173,6 +176,9 @@ class PDBParser {
         const chainMap = new Map();
 
         for (const residue of this.residues) {
+            // Skip ligands (HETATM that aren't water or standard protein/nucleic residues)
+            if (residue.isLigand) continue;
+
             if (!chainMap.has(residue.chainId)) {
                 chainMap.set(residue.chainId, {
                     id: residue.chainId,
@@ -198,6 +204,75 @@ class PDBParser {
                 chain.type = 'other';
             }
         }
+    }
+
+    buildLigands() {
+        // Group HETATM residues that aren't water or standard protein/nucleic
+        const ligandMap = new Map();
+
+        for (const residue of this.residues) {
+            // Identify ligands: HETATM residues that aren't water
+            const hasHetAtom = residue.atoms.some(a => a.isHetAtom);
+            const isLigand = hasHetAtom && !residue.isWater && !residue.isProtein && !residue.isNucleic;
+
+            if (isLigand) {
+                residue.isLigand = true;
+
+                const ligandKey = `${residue.chainId}_${residue.resName}_${residue.resSeq}`;
+
+                if (!ligandMap.has(ligandKey)) {
+                    ligandMap.set(ligandKey, {
+                        resName: residue.resName,
+                        chainId: residue.chainId,
+                        resSeq: residue.resSeq,
+                        atoms: residue.atoms,
+                        bonds: this.calculateLigandBonds(residue.atoms)
+                    });
+                }
+            }
+        }
+
+        this.ligands = Array.from(ligandMap.values());
+    }
+
+    calculateLigandBonds(atoms) {
+        // Calculate bonds based on distance criteria
+        const bonds = [];
+        const maxBondDistance = 1.8; // Maximum bond distance in Angstroms
+
+        // Common covalent radii for bond detection (in Angstroms)
+        const covalentRadii = {
+            'H': 0.31, 'C': 0.76, 'N': 0.71, 'O': 0.66, 'S': 1.05,
+            'P': 1.07, 'F': 0.57, 'CL': 1.02, 'BR': 1.20, 'I': 1.39,
+            'FE': 1.32, 'MG': 1.41, 'CA': 1.76, 'ZN': 1.22
+        };
+
+        for (let i = 0; i < atoms.length; i++) {
+            for (let j = i + 1; j < atoms.length; j++) {
+                const atom1 = atoms[i];
+                const atom2 = atoms[j];
+
+                const dx = atom2.x - atom1.x;
+                const dy = atom2.y - atom1.y;
+                const dz = atom2.z - atom1.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                // Get covalent radii
+                const r1 = covalentRadii[atom1.element.toUpperCase()] || 0.76;
+                const r2 = covalentRadii[atom2.element.toUpperCase()] || 0.76;
+                const maxDist = (r1 + r2) * 1.3; // Allow 30% tolerance
+
+                if (distance < maxDist && distance > 0.4) {
+                    bonds.push({
+                        atom1: atom1,
+                        atom2: atom2,
+                        distance: distance
+                    });
+                }
+            }
+        }
+
+        return bonds;
     }
 
     assignSecondaryStructure() {

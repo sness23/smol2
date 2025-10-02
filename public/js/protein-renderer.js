@@ -21,6 +21,7 @@ class ProteinRenderer {
         this.showBackbone = true;
         this.showSticks = false;
         this.showSpheres = false;
+        this.showLigands = true; // Show ligands by default
         this.lodEnabled = true;
 
         // Performance tracking
@@ -70,6 +71,7 @@ class ProteinRenderer {
                 backboneTraces: [],
                 sticks: [], // Combined atoms and bonds
                 spheres: [], // Space-filling CPK spheres
+                ligands: [], // Wireframe ligand representations
                 bounds: null,
                 visible: true
             };
@@ -160,6 +162,11 @@ class ProteinRenderer {
         // Generate spheres (space-filling)
         if (this.showSpheres) {
             promises.push(this.generateProteinSpheres(proteinData));
+        }
+
+        // Generate ligand wireframes
+        if (this.showLigands) {
+            promises.push(this.generateProteinLigands(proteinData));
         }
 
         await Promise.all(promises);
@@ -273,6 +280,26 @@ class ProteinRenderer {
         console.log(`Generated ${proteinData.spheres.length} space-filling spheres for ${proteinData.filename}`);
     }
 
+    async generateProteinLigands(proteinData) {
+        console.log(`Generating ligand wireframes for ${proteinData.filename}...`);
+
+        // Generate wireframe representation for all ligands
+        const ligandMeshes = this.ribbonGenerator.createLigandWireframe(proteinData.parser);
+
+        // Apply position offset to each ligand mesh
+        ligandMeshes.forEach(mesh => {
+            mesh.position.x += proteinData.position.x;
+            mesh.position.y += proteinData.position.y;
+            mesh.position.z += proteinData.position.z;
+            mesh.proteinId = proteinData.filename;
+            mesh.isVisible = this.showLigands;
+        });
+
+        proteinData.ligands.push(...ligandMeshes);
+
+        console.log(`Generated ${proteinData.ligands.length} ligand wireframe elements for ${proteinData.filename}`);
+    }
+
     // Remove a specific protein
     removeProtein(filename) {
         const proteinData = this.proteins.get(filename);
@@ -288,6 +315,7 @@ class ProteinRenderer {
         proteinData.backboneTraces.forEach(trace => trace.dispose());
         proteinData.sticks.forEach(stick => stick.dispose());
         proteinData.spheres.forEach(sphere => sphere.dispose());
+        proteinData.ligands.forEach(ligand => ligand.dispose());
 
         // Remove from map
         this.proteins.delete(filename);
@@ -309,6 +337,7 @@ class ProteinRenderer {
             proteinData.backboneTraces.forEach(trace => trace.dispose());
             proteinData.sticks.forEach(stick => stick.dispose());
             proteinData.spheres.forEach(sphere => sphere.dispose());
+            proteinData.ligands.forEach(ligand => ligand.dispose());
         }
 
         this.proteins.clear();
@@ -349,6 +378,9 @@ class ProteinRenderer {
             }
             if (proteinData.spheres.includes(mesh)) {
                 return 'spheres';
+            }
+            if (proteinData.ligands.includes(mesh)) {
+                return 'ligands';
             }
         }
         return 'unknown';
@@ -519,9 +551,37 @@ class ProteinRenderer {
                     this.generateSpheres();
                 }
                 break;
+
+            case 'ligands':
+                this.showLigands = visible;
+                for (const [filename, proteinData] of this.proteins) {
+                    for (const ligand of proteinData.ligands) {
+                        ligand.isVisible = visible;
+                    }
+                }
+                if (visible) {
+                    this.generateLigands();
+                }
+                break;
         }
 
         console.log(`${type} representation: ${visible ? 'shown' : 'hidden'}`);
+    }
+
+    // Legacy method - now regenerates for all proteins
+    async generateLigands() {
+        console.log('Regenerating ligand wireframes for all proteins...');
+
+        for (const [filename, proteinData] of this.proteins) {
+            // Clear existing ligands for this protein
+            proteinData.ligands.forEach(ligand => ligand.dispose());
+            proteinData.ligands = [];
+
+            // Generate new ones
+            if (this.showLigands) {
+                await this.generateProteinLigands(proteinData);
+            }
+        }
     }
 
     // Apply color scheme to all proteins
@@ -558,7 +618,7 @@ class ProteinRenderer {
             this.renderStats.helixCount += stats.helixCount;
             this.renderStats.sheetCount += stats.sheetCount;
             this.renderStats.coilCount += stats.coilCount;
-            this.renderStats.meshCount += proteinData.meshes.length + proteinData.backboneTraces.length + proteinData.sticks.length + proteinData.spheres.length;
+            this.renderStats.meshCount += proteinData.meshes.length + proteinData.backboneTraces.length + proteinData.sticks.length + proteinData.spheres.length + proteinData.ligands.length;
         }
     }
 
@@ -682,6 +742,8 @@ class ProteinRenderer {
             shouldBeVisible = this.showSticks;
         } else if (meshType === 'spheres') {
             shouldBeVisible = this.showSpheres;
+        } else if (meshType === 'ligands') {
+            shouldBeVisible = this.showLigands;
         }
 
         // Apply LOD only if the representation is supposed to be visible

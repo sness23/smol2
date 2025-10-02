@@ -944,6 +944,136 @@ class RibbonGeometryGenerator {
         return this.materials.get('bond');
     }
 
+    // Create wireframe representation for ligands
+    createLigandWireframe(parser) {
+        console.log(`Creating wireframe representation for ${parser.ligands.length} ligands`);
+        const meshes = [];
+
+        for (const ligand of parser.ligands) {
+            // Create atom spheres for each ligand atom
+            for (const atom of ligand.atoms) {
+                const sphere = this.createLigandAtomSphere(atom);
+                if (sphere) {
+                    meshes.push(sphere);
+                }
+            }
+
+            // Create bond cylinders for each ligand bond
+            for (const bond of ligand.bonds) {
+                const cylinder = this.createLigandBondCylinder(bond);
+                if (cylinder) {
+                    meshes.push(cylinder);
+                }
+            }
+        }
+
+        console.log(`Created ${meshes.length} ligand wireframe elements`);
+        return meshes;
+    }
+
+    // Create atom sphere for ligand with CPK coloring
+    createLigandAtomSphere(atom) {
+        try {
+            const element = atom.element.toUpperCase();
+            const radius = 0.25; // Small sphere for wireframe style
+
+            const sphere = BABYLON.MeshBuilder.CreateSphere(`ligand_atom_${atom.id}`, {
+                diameter: radius * 2,
+                segments: 8 // Low poly for wireframe style
+            }, this.scene);
+
+            sphere.position = new BABYLON.Vector3(atom.x, atom.y, atom.z);
+
+            // Apply CPK color
+            const color = this.getCPKColor(element);
+            const material = this.getOrCreateCPKMaterial(element, color);
+            sphere.material = material;
+
+            return sphere;
+
+        } catch (error) {
+            console.warn('Error creating ligand atom sphere:', error);
+            return null;
+        }
+    }
+
+    // Create bond cylinder for ligand
+    createLigandBondCylinder(bond) {
+        try {
+            const atom1 = bond.atom1;
+            const atom2 = bond.atom2;
+
+            const start = new BABYLON.Vector3(atom1.x, atom1.y, atom1.z);
+            const end = new BABYLON.Vector3(atom2.x, atom2.y, atom2.z);
+            const vector = end.subtract(start);
+            const length = vector.length();
+
+            if (length < 0.1) return null;
+
+            // Create thin cylinder for wireframe style
+            const cylinder = BABYLON.MeshBuilder.CreateCylinder(`ligand_bond_${atom1.id}_${atom2.id}`, {
+                height: length,
+                diameter: 0.1, // Thin for wireframe
+                tessellation: 6
+            }, this.scene);
+
+            // Position and orient
+            const center = start.add(end).scale(0.5);
+            cylinder.position = center;
+
+            const up = new BABYLON.Vector3(0, 1, 0);
+            const axis = vector.normalize();
+            const rotationAxis = BABYLON.Vector3.Cross(up, axis);
+            const angle = Math.acos(BABYLON.Vector3.Dot(up, axis));
+
+            if (rotationAxis.length() > 0.001) {
+                cylinder.rotationQuaternion = BABYLON.Quaternion.RotationAxis(rotationAxis.normalize(), angle);
+            }
+
+            // Gray color for bonds
+            cylinder.material = this.getLigandBondMaterial();
+
+            return cylinder;
+
+        } catch (error) {
+            console.warn('Error creating ligand bond cylinder:', error);
+            return null;
+        }
+    }
+
+    // Get CPK color for element
+    getCPKColor(element) {
+        const color = this.cpkColors[element] || this.cpkColors['default'];
+        return new BABYLON.Color3(color.r, color.g, color.b);
+    }
+
+    // Get or create CPK material for specific element
+    getOrCreateCPKMaterial(element, color) {
+        const matKey = `cpk_${element}`;
+
+        if (!this.materials.has(matKey)) {
+            const material = new BABYLON.StandardMaterial(matKey, this.scene);
+            material.diffuseColor = color;
+            material.specularColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+            material.shininess = 32;
+            this.materials.set(matKey, material);
+        }
+
+        return this.materials.get(matKey);
+    }
+
+    // Get or create ligand bond material
+    getLigandBondMaterial() {
+        if (!this.materials.has('ligand_bond')) {
+            const material = new BABYLON.StandardMaterial('ligandBondMaterial', this.scene);
+            material.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5); // Gray
+            material.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+            material.shininess = 16;
+            this.materials.set('ligand_bond', material);
+        }
+        return this.materials.get('ligand_bond');
+    }
+
     // Cleanup resources
     dispose() {
         for (const material of this.materials.values()) {
